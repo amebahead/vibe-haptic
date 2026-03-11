@@ -8,15 +8,8 @@ export declare function actuate(actuationId: number, intensity: number): void
 export declare function click(): void
 export declare function weakClick(): void
 export declare function strongClick(): void
-
-// Keyboard module
 export declare function isAccessibilityGranted(): boolean
 export declare function findTerminalPid(): number | null
 export declare function sendKeystrokeToTerminal(terminalPid: number, key: string): void
-
-// Touch module
-export declare function startTouchListener(
-  callback: (gesture: string) => void,
-  tapTimeoutMs?: number,
-): void
+export declare function startTouchListener(callback: (gesture: string) => void, tapTimeoutMs?: number | undefined | null): void
 export declare function stopTouchListener(): void
