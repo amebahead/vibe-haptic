@@ -7,6 +7,8 @@ export const DEFAULT_PATTERNS: Record<string, PatternConfig> = {
   alert: { beat: '6/0.5 6/1.0 6/0.5' },
   dopamine: { beat: '6666666 5/1.0 4/1.0 3/1.0', intensity: 0.1 },
   noise: { beat: '6543654365436543' },
+  'confirm-yes': { beat: '6/0.6 3/0.4' },
+  'confirm-no': { beat: '6/1.0  6/1.0' },
 }
 
 export function resolvePattern(

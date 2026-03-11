@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { HapticEngine, parseBeat } from '../src/haptic'
 import { DEFAULT_CONFIG, loadConfig } from '../src/config'
+import { DEFAULT_PATTERNS, resolvePattern } from '../src/patterns'
 import type { HapticConfig } from '../src/types'
 
 const mockNativeModule = { actuate: () => {} }
@@ -135,6 +136,43 @@ describe('GestureConfig type', () => {
     }
     expect(config.gesture!.enabled).toBe(false)
     expect(config.gesture!.tapTimeout).toBeUndefined()
+  })
+})
+
+describe('Confirmation Patterns', () => {
+  test('confirm-yes pattern exists in DEFAULT_PATTERNS', () => {
+    expect(DEFAULT_PATTERNS['confirm-yes']).toBeDefined()
+    expect(DEFAULT_PATTERNS['confirm-yes'].beat).toBe('6/0.6 3/0.4')
+  })
+
+  test('confirm-no pattern exists in DEFAULT_PATTERNS', () => {
+    expect(DEFAULT_PATTERNS['confirm-no']).toBeDefined()
+    expect(DEFAULT_PATTERNS['confirm-no'].beat).toBe('6/1.0  6/1.0')
+  })
+
+  test('resolvePattern finds confirm-yes', () => {
+    const result = resolvePattern('confirm-yes', undefined)
+    expect(result).toEqual({ beat: '6/0.6 3/0.4' })
+  })
+
+  test('resolvePattern finds confirm-no', () => {
+    const result = resolvePattern('confirm-no', undefined)
+    expect(result).toEqual({ beat: '6/1.0  6/1.0' })
+  })
+
+  test('confirm-yes can be overridden by user patterns', () => {
+    const result = resolvePattern('confirm-yes', { 'confirm-yes': '6/1.0' })
+    expect(result).toEqual({ beat: '6/1.0' })
+  })
+
+  test('confirm-yes pattern triggers without error', () => {
+    const engine = createTestEngine({})
+    expect(() => engine.trigger('confirm-yes')).not.toThrow()
+  })
+
+  test('confirm-no pattern triggers without error', () => {
+    const engine = createTestEngine({})
+    expect(() => engine.trigger('confirm-no')).not.toThrow()
   })
 })
 
