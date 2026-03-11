@@ -1,5 +1,5 @@
-import { loadConfig } from '../config'
 import { handlePermissionGesture } from '../claude/gesture'
+import { loadConfig } from '../config'
 import type { GestureConfig } from '../types'
 
 const DEFAULT_GESTURE_CONFIG: GestureConfig = {

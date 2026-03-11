@@ -11,5 +11,8 @@ export declare function strongClick(): void
 export declare function isAccessibilityGranted(): boolean
 export declare function findTerminalPid(): number | null
 export declare function sendKeystrokeToTerminal(terminalPid: number, key: string): void
-export declare function startTouchListener(callback: (gesture: string) => void, tapTimeoutMs?: number | undefined | null): void
+export declare function startTouchListener(
+  callback: (gesture: string) => void,
+  tapTimeoutMs?: number | undefined | null,
+): void
 export declare function stopTouchListener(): void

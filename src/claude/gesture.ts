@@ -64,10 +64,7 @@ export interface GestureHandlerOptions {
   onPatternTriggered?: (patternName: string) => void
 }
 
-export async function handlePermissionGesture(
-  terminalPid: number,
-  options?: GestureHandlerOptions,
-): Promise<void> {
+export async function handlePermissionGesture(terminalPid: number, options?: GestureHandlerOptions): Promise<void> {
   const native = options?.nativeModule ?? loadNativeModule()
   if (!native) return
 
@@ -103,24 +100,21 @@ export async function handlePermissionGesture(
       resolve()
     }
 
-    native.startTouchListener(
-      (gesture: GestureType) => {
-        if (answered) return
-        answered = true
+    native.startTouchListener((gesture: GestureType) => {
+      if (answered) return
+      answered = true
 
-        const key = gesture === 'single' ? 'y' : 'n'
-        native.sendKeystrokeToTerminal(terminalPid, key)
+      const key = gesture === 'single' ? 'y' : 'n'
+      native.sendKeystrokeToTerminal(terminalPid, key)
 
-        const pattern = gesture === 'single' ? 'confirm-yes' : 'confirm-no'
-        if (options?.onPatternTriggered) {
-          options.onPatternTriggered(pattern)
-        }
-        engine.trigger(pattern)
+      const pattern = gesture === 'single' ? 'confirm-yes' : 'confirm-no'
+      if (options?.onPatternTriggered) {
+        options.onPatternTriggered(pattern)
+      }
+      engine.trigger(pattern)
 
-        cleanup()
-      },
-      gestureConfig.tapTimeout,
-    )
+      cleanup()
+    }, gestureConfig.tapTimeout)
 
     // Auto-stop after timeout
     setTimeout(() => {

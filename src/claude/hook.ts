@@ -1,11 +1,11 @@
-import { appendFileSync } from 'node:fs'
 import { spawn } from 'node:child_process'
+import { appendFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createHapticEngine } from '../haptic'
 import { loadConfig } from '../config'
+import { createHapticEngine } from '../haptic'
 import type { GestureConfig } from '../types'
 
 const DEBUG = process.env.VIBE_HAPTIC_DEBUG === '1'

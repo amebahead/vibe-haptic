@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { HapticEngine, parseBeat } from '../src/haptic'
 import { DEFAULT_CONFIG, loadConfig } from '../src/config'
+import { HapticEngine, parseBeat } from '../src/haptic'
 import { DEFAULT_PATTERNS, resolvePattern } from '../src/patterns'
 import type { HapticConfig } from '../src/types'
 

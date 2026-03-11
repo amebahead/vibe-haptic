@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
-import { handlePermissionGesture } from '../src/claude/gesture'
 import type { NativeGestureModule } from '../src/claude/gesture'
+import { handlePermissionGesture } from '../src/claude/gesture'
 
 const LOCK_FILE = '/tmp/vibe-haptic-gesture.lock'
 
@@ -19,7 +19,7 @@ describe('Gesture Lock File', () => {
     expect(result).toBe(true)
     expect(existsSync(LOCK_FILE)).toBe(true)
     const content = readFileSync(LOCK_FILE, 'utf-8')
-    expect(parseInt(content)).toBe(process.pid)
+    expect(parseInt(content, 10)).toBe(process.pid)
     releaseGestureLock()
   })
 
@@ -55,9 +55,10 @@ describe('Gesture Lock File', () => {
   })
 })
 
-function createMockNative(
-  onGesture?: (cb: (gesture: string) => void) => void,
-): { native: NativeGestureModule; calls: Array<{ fn: string; args: unknown[] }> } {
+function createMockNative(onGesture?: (cb: (gesture: string) => void) => void): {
+  native: NativeGestureModule
+  calls: Array<{ fn: string; args: unknown[] }>
+} {
   const calls: Array<{ fn: string; args: unknown[] }> = []
   const native: NativeGestureModule = {
     startTouchListener: (cb, _timeout?) => {
