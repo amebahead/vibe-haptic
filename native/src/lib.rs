@@ -2,6 +2,9 @@ use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
 #[cfg(target_os = "macos")]
+mod keyboard;
+
+#[cfg(target_os = "macos")]
 mod macos {
     use std::ffi::c_void;
     use std::ptr;
@@ -208,4 +211,28 @@ pub fn weak_click() -> Result<()> {
 #[napi]
 pub fn strong_click() -> Result<()> {
     actuate(15, 1.0)
+}
+
+#[napi]
+pub fn is_accessibility_granted() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        keyboard::macos::is_accessibility_granted()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        false
+    }
+}
+
+#[napi]
+pub fn find_terminal_pid() -> Option<i32> {
+    #[cfg(target_os = "macos")]
+    {
+        keyboard::macos::find_terminal_pid()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        None
+    }
 }
