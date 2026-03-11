@@ -236,3 +236,17 @@ pub fn find_terminal_pid() -> Option<i32> {
         None
     }
 }
+
+#[napi]
+pub fn send_keystroke_to_terminal(terminal_pid: i32, key: String) -> Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        keyboard::macos::send_keystroke_to_terminal(terminal_pid, &key)
+            .map_err(|e| Error::from_reason(e))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        // Graceful no-op on non-macOS per spec
+        Ok(())
+    }
+}
