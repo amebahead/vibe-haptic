@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process'
 import { appendFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
@@ -7,6 +6,8 @@ import { fileURLToPath } from 'node:url'
 import { loadConfig } from '../config'
 import { createHapticEngine } from '../haptic'
 import type { GestureConfig } from '../types'
+import type { NativeGestureModule } from './gesture'
+import { handlePermissionGesture } from './gesture'
 
 const DEBUG = process.env.VIBE_HAPTIC_DEBUG === '1'
 
@@ -32,7 +33,7 @@ const DEFAULT_GESTURE_CONFIG: GestureConfig = {
   listenTimeout: 10_000,
 }
 
-function loadNativeModule(): { isAccessibilityGranted: () => boolean; findTerminalPid: () => number | null } | null {
+function loadNativeModule(): NativeGestureModule | null {
   try {
     const currentDir = dirname(fileURLToPath(import.meta.url))
     const nativePath = join(currentDir, '..', 'native', 'vibe-haptic-native.node')
@@ -41,19 +42,6 @@ function loadNativeModule(): { isAccessibilityGranted: () => boolean; findTermin
   } catch {
     return null
   }
-}
-
-function spawnGestureListener(terminalPid: number): void {
-  const currentDir = dirname(fileURLToPath(import.meta.url))
-  const listenerPath = join(currentDir, 'gesture-listener.js')
-
-  debug('Spawning gesture listener', { listenerPath, terminalPid })
-
-  const child = spawn('node', [listenerPath, String(terminalPid)], {
-    detached: true,
-    stdio: 'ignore',
-  })
-  child.unref()
 }
 
 export async function handleHookEvent(input: ClaudeHookInput): Promise<void> {
@@ -66,10 +54,7 @@ export async function handleHookEvent(input: ClaudeHookInput): Promise<void> {
     await engine.triggerForEvent('stop')
   } else if (input.hook_event_name === 'Notification') {
     debug('Triggering prompt event for notification', { notification_type: input.notification_type })
-    // Always play haptic feedback for all notification types
-    await engine.triggerForEvent('prompt')
 
-    // Additionally handle gesture input for permission_prompt only
     if (input.notification_type === 'permission_prompt') {
       debug('Permission prompt detected — checking gesture eligibility')
 
@@ -79,30 +64,29 @@ export async function handleHookEvent(input: ClaudeHookInput): Promise<void> {
         ...config.gesture,
       }
 
-      if (!gestureConfig.enabled) {
-        debug('Gesture input disabled by config')
-        return
+      const native = gestureConfig.enabled ? loadNativeModule() : null
+      let terminalPid: number | null = null
+
+      if (native?.isAccessibilityGranted()) {
+        terminalPid = native.findTerminalPid()
       }
 
-      const native = loadNativeModule()
-      if (!native) {
-        debug('Native module not available — skipping gesture')
-        return
+      if (terminalPid !== null && native) {
+        debug('Starting gesture listener in-process', { terminalPid })
+        // Run haptic + gesture listener in parallel — listener is ready when user feels the tap
+        await Promise.all([
+          engine.triggerForEvent('prompt'),
+          handlePermissionGesture(terminalPid, {
+            nativeModule: native,
+            config: { gesture: gestureConfig },
+          }),
+        ])
+      } else {
+        debug('Gesture not available, haptic only')
+        await engine.triggerForEvent('prompt')
       }
-
-      if (!native.isAccessibilityGranted()) {
-        debug('Accessibility permission not granted — skipping gesture')
-        return
-      }
-
-      const terminalPid = native.findTerminalPid()
-      if (terminalPid === null) {
-        debug('Terminal PID not found — skipping gesture')
-        return
-      }
-
-      debug('Spawning gesture listener', { terminalPid })
-      spawnGestureListener(terminalPid)
+    } else {
+      await engine.triggerForEvent('prompt')
     }
   } else {
     debug('Unknown hook event', { hook_event_name: input.hook_event_name })

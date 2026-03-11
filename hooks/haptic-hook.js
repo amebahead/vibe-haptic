@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 
 // src/claude/hook.ts
-import { spawn } from 'node:child_process'
 // src/config.ts
 import { appendFileSync, existsSync, readFileSync } from 'node:fs'
-import { createRequire as createRequire2 } from 'node:module'
+import { createRequire as createRequire3 } from 'node:module'
 import { homedir, homedir as homedir2 } from 'node:os'
-import { dirname as dirname2, join as join2 } from 'node:path'
-import { fileURLToPath as fileURLToPath2 } from 'node:url'
+import { dirname as dirname3, join as join3 } from 'node:path'
+import { fileURLToPath as fileURLToPath3 } from 'node:url'
 
 var DEFAULT_GESTURE_CONFIG = {
   enabled: true,
@@ -199,6 +198,99 @@ function createHapticEngine(agent) {
   return new HapticEngine(loadConfig(agent))
 }
 
+// src/claude/gesture.ts
+import { existsSync as existsSync2, readFileSync as readFileSync2, unlinkSync, writeFileSync } from 'node:fs'
+import { createRequire as createRequire2 } from 'node:module'
+import { dirname as dirname2, join as join2 } from 'node:path'
+import { fileURLToPath as fileURLToPath2 } from 'node:url'
+
+var LOCK_FILE = '/tmp/vibe-haptic-gesture.lock'
+function isProcessAlive(pid) {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+function acquireGestureLock() {
+  try {
+    writeFileSync(LOCK_FILE, String(process.pid), { flag: 'wx' })
+    return true
+  } catch {}
+  try {
+    const existingPid = parseInt(readFileSync2(LOCK_FILE, 'utf-8').trim(), 10)
+    if (!Number.isNaN(existingPid) && isProcessAlive(existingPid)) {
+      return false
+    }
+  } catch {}
+  writeFileSync(LOCK_FILE, String(process.pid))
+  return true
+}
+function releaseGestureLock() {
+  try {
+    if (existsSync2(LOCK_FILE)) {
+      unlinkSync(LOCK_FILE)
+    }
+  } catch {}
+}
+async function handlePermissionGesture(terminalPid, options) {
+  const native = options?.nativeModule ?? loadNativeModule()
+  if (!native) return
+  const gestureConfig = options?.config?.gesture ?? {
+    enabled: true,
+    tapTimeout: 300,
+    listenTimeout: 1e4,
+  }
+  if (!gestureConfig.enabled) return
+  if (!acquireGestureLock()) return
+  process.once('exit', releaseGestureLock)
+  process.once('SIGTERM', () => {
+    releaseGestureLock()
+    process.exit(0)
+  })
+  process.once('SIGINT', () => {
+    releaseGestureLock()
+    process.exit(0)
+  })
+  const engine = createHapticEngine('claude')
+  let answered = false
+  return new Promise((resolve) => {
+    const cleanup = () => {
+      native.stopTouchListener()
+      releaseGestureLock()
+      resolve()
+    }
+    native.startTouchListener((gesture) => {
+      if (answered) return
+      answered = true
+      const key = gesture === 'single' ? 'y' : 'n'
+      native.sendKeystrokeToTerminal(terminalPid, key)
+      const pattern = gesture === 'single' ? 'confirm-yes' : 'confirm-no'
+      if (options?.onPatternTriggered) {
+        options.onPatternTriggered(pattern)
+      }
+      engine.trigger(pattern)
+      cleanup()
+    }, gestureConfig.tapTimeout)
+    setTimeout(() => {
+      if (!answered) {
+        cleanup()
+      }
+    }, gestureConfig.listenTimeout)
+  })
+}
+function loadNativeModule() {
+  try {
+    const currentDir = dirname2(fileURLToPath2(import.meta.url))
+    const nativePath = join2(currentDir, '..', 'native', 'vibe-haptic-native.node')
+    const require2 = createRequire2(import.meta.url)
+    return require2(nativePath)
+  } catch {
+    return null
+  }
+}
+
 // src/claude/hook.ts
 var DEBUG = process.env.VIBE_HAPTIC_DEBUG === '1'
 function debug(message, data) {
@@ -217,25 +309,15 @@ var DEFAULT_GESTURE_CONFIG2 = {
   tapTimeout: 300,
   listenTimeout: 1e4,
 }
-function loadNativeModule() {
+function loadNativeModule2() {
   try {
-    const currentDir = dirname2(fileURLToPath2(import.meta.url))
-    const nativePath = join2(currentDir, '..', 'native', 'vibe-haptic-native.node')
-    const require2 = createRequire2(import.meta.url)
+    const currentDir = dirname3(fileURLToPath3(import.meta.url))
+    const nativePath = join3(currentDir, '..', 'native', 'vibe-haptic-native.node')
+    const require2 = createRequire3(import.meta.url)
     return require2(nativePath)
   } catch {
     return null
   }
-}
-function spawnGestureListener(terminalPid) {
-  const currentDir = dirname2(fileURLToPath2(import.meta.url))
-  const listenerPath = join2(currentDir, 'gesture-listener.js')
-  debug('Spawning gesture listener', { listenerPath, terminalPid })
-  const child = spawn('node', [listenerPath, String(terminalPid)], {
-    detached: true,
-    stdio: 'ignore',
-  })
-  child.unref()
 }
 async function handleHookEvent(input) {
   debug('handleHookEvent called', input)
@@ -245,7 +327,6 @@ async function handleHookEvent(input) {
     await engine.triggerForEvent('stop')
   } else if (input.hook_event_name === 'Notification') {
     debug('Triggering prompt event for notification', { notification_type: input.notification_type })
-    await engine.triggerForEvent('prompt')
     if (input.notification_type === 'permission_prompt') {
       debug('Permission prompt detected — checking gesture eligibility')
       const config = loadConfig('claude')
@@ -253,26 +334,26 @@ async function handleHookEvent(input) {
         ...DEFAULT_GESTURE_CONFIG2,
         ...config.gesture,
       }
-      if (!gestureConfig.enabled) {
-        debug('Gesture input disabled by config')
-        return
+      const native = gestureConfig.enabled ? loadNativeModule2() : null
+      let terminalPid = null
+      if (native?.isAccessibilityGranted()) {
+        terminalPid = native.findTerminalPid()
       }
-      const native = loadNativeModule()
-      if (!native) {
-        debug('Native module not available — skipping gesture')
-        return
+      if (terminalPid !== null && native) {
+        debug('Starting gesture listener in-process', { terminalPid })
+        await Promise.all([
+          engine.triggerForEvent('prompt'),
+          handlePermissionGesture(terminalPid, {
+            nativeModule: native,
+            config: { gesture: gestureConfig },
+          }),
+        ])
+      } else {
+        debug('Gesture not available, haptic only')
+        await engine.triggerForEvent('prompt')
       }
-      if (!native.isAccessibilityGranted()) {
-        debug('Accessibility permission not granted — skipping gesture')
-        return
-      }
-      const terminalPid = native.findTerminalPid()
-      if (terminalPid === null) {
-        debug('Terminal PID not found — skipping gesture')
-        return
-      }
-      debug('Spawning gesture listener', { terminalPid })
-      spawnGestureListener(terminalPid)
+    } else {
+      await engine.triggerForEvent('prompt')
     }
   } else {
     debug('Unknown hook event', { hook_event_name: input.hook_event_name })

@@ -73,33 +73,4 @@ for (const output of hookResult.outputs) {
   }
 }
 
-// Bundle gesture listener (runs as detached process, needs all deps inlined)
-const gestureResult = await Bun.build({
-  entrypoints: ['src/bin/gesture-listener.ts'],
-  outdir: 'hooks',
-  target: 'node',
-  format: 'esm',
-  splitting: false,
-  minify: false,
-  external: [],
-})
-
-if (!gestureResult.success) {
-  console.error('Gesture listener bundle failed:')
-  for (const log of gestureResult.logs) {
-    console.error(log)
-  }
-  process.exit(1)
-}
-
-for (const output of gestureResult.outputs) {
-  if (output.path.endsWith('.js')) {
-    let content = await output.text()
-    if (content.includes('require(') && !content.includes('createRequire')) {
-      content = createRequireBanner + content
-    }
-    await Bun.write(output.path, content)
-  }
-}
-
 console.log('Build completed successfully!')
