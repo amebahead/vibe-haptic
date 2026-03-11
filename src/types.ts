@@ -5,9 +5,16 @@ export interface PatternConfig {
   intensity?: number
 }
 
+export interface GestureConfig {
+  enabled: boolean
+  tapTimeout: number
+  listenTimeout: number
+}
+
 export interface HapticConfig {
   patterns?: Record<string, string | PatternConfig>
   events?: Partial<Record<HapticEvent, string>>
+  gesture?: Partial<GestureConfig>
 }
 
 export interface ResolvedPattern {

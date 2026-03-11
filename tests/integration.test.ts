@@ -93,6 +93,32 @@ describe('Platform Handling', () => {
   })
 })
 
+describe('GestureConfig type', () => {
+  test('HapticConfig accepts gesture field', () => {
+    const config: HapticConfig = {
+      gesture: {
+        enabled: true,
+        tapTimeout: 300,
+        listenTimeout: 10_000,
+      },
+    }
+    expect(config.gesture).toBeDefined()
+    expect(config.gesture!.enabled).toBe(true)
+    expect(config.gesture!.tapTimeout).toBe(300)
+    expect(config.gesture!.listenTimeout).toBe(10_000)
+  })
+
+  test('HapticConfig accepts partial gesture field', () => {
+    const config: HapticConfig = {
+      gesture: {
+        enabled: false,
+      },
+    }
+    expect(config.gesture!.enabled).toBe(false)
+    expect(config.gesture!.tapTimeout).toBeUndefined()
+  })
+})
+
 describe('parseBeat', () => {
   test('parses simple actuation digits', () => {
     const tokens = parseBeat('66', 1.0)
