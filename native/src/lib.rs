@@ -3,6 +3,19 @@ use napi_derive::napi;
 
 #[cfg(target_os = "macos")]
 mod keyboard;
+#[cfg(target_os = "macos")]
+mod touch;
+
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex as StdMutex};
+
+#[cfg(target_os = "macos")]
+use napi::threadsafe_function::{ErrorStrategy, ThreadsafeFunction};
+
+#[cfg(target_os = "macos")]
+static ACTIVE_DEVICES: StdMutex<Option<Vec<touch::macos::DeviceHandle>>> = StdMutex::new(None);
+#[cfg(target_os = "macos")]
+static ACTIVE_STOP_FLAG: StdMutex<Option<Arc<AtomicBool>>> = StdMutex::new(None);
 
 #[cfg(target_os = "macos")]
 mod macos {
@@ -248,5 +261,60 @@ pub fn send_keystroke_to_terminal(terminal_pid: i32, key: String) -> Result<()> 
     {
         // Graceful no-op on non-macOS per spec
         Ok(())
+    }
+}
+
+#[napi]
+pub fn start_touch_listener(
+    #[napi(ts_arg_type = "(gesture: string) => void")]
+    callback: napi::JsFunction,
+    tap_timeout_ms: Option<u32>,
+) -> Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        let tsfn: ThreadsafeFunction<String, ErrorStrategy::Fatal> =
+            callback.create_threadsafe_function(0, |ctx: napi::threadsafe_function::ThreadSafeCallContext<String>| {
+                Ok(vec![ctx.env.create_string(ctx.value.as_str())?])
+            })?;
+
+        let stop_flag = Arc::new(AtomicBool::new(false));
+        let timeout = tap_timeout_ms.unwrap_or(300);
+
+        let devices = touch::macos::start_touch_listener(tsfn, timeout, stop_flag.clone())?;
+
+        if let Ok(mut guard) = ACTIVE_DEVICES.lock() {
+            *guard = Some(devices);
+        }
+        if let Ok(mut guard) = ACTIVE_STOP_FLAG.lock() {
+            *guard = Some(stop_flag);
+        }
+
+        Ok(())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        // Graceful no-op on non-macOS per spec
+        Ok(())
+    }
+}
+
+#[napi]
+pub fn stop_touch_listener() {
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(guard) = ACTIVE_STOP_FLAG.lock() {
+            if let Some(ref flag) = *guard {
+                flag.store(true, Ordering::Relaxed);
+            }
+        }
+        if let Ok(mut guard) = ACTIVE_DEVICES.lock() {
+            if let Some(ref devices) = *guard {
+                touch::macos::stop_touch_listener(devices);
+            }
+            *guard = None;
+        }
+        if let Ok(mut guard) = ACTIVE_STOP_FLAG.lock() {
+            *guard = None;
+        }
     }
 }
