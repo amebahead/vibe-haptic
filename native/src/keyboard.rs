@@ -103,10 +103,38 @@ pub mod macos {
     use std::thread;
     use std::time::Duration;
 
+    use foreign_types::ForeignType;
+
+    // CoreGraphics FFI for setting Unicode string on keyboard events
+    extern "C" {
+        fn CGEventKeyboardSetUnicodeString(
+            event: *mut core_graphics::sys::CGEvent,
+            string_length: u64,
+            unicode_string: *const u16,
+        );
+    }
+
+    /// Set the Unicode string on a CGEvent so terminals receive the correct character.
+    fn set_event_unicode(event: &CGEvent, ch: char) {
+        let mut buf = [0u16; 2];
+        let encoded = ch.encode_utf16(&mut buf);
+        let len = encoded.len() as u64;
+        unsafe {
+            CGEventKeyboardSetUnicodeString(
+                event.as_ptr(),
+                len,
+                buf.as_ptr(),
+            );
+        }
+    }
+
     fn keycode_for_char(c: char) -> Option<u16> {
         match c {
             'y' => Some(0x10),
             'n' => Some(0x2D),
+            '1' => Some(0x12),
+            '2' => Some(0x13),
+            '3' => Some(0x14),
             _ => None,
         }
     }
@@ -121,11 +149,7 @@ pub mod macos {
             .ok_or_else(|| format!("Unsupported key: {}", key))?;
 
         unsafe {
-            // 1. Save current frontmost app
-            let workspace: id = msg_send![class!(NSWorkspace), sharedWorkspace];
-            let front_app: id = msg_send![workspace, frontmostApplication];
-
-            // 2. Activate terminal by PID
+            // 1. Activate terminal by PID (bring to front so CGEvent reaches it)
             let terminal_app: id = msg_send![
                 class!(NSRunningApplication),
                 runningApplicationWithProcessIdentifier: terminal_pid
@@ -136,40 +160,39 @@ pub mod macos {
                     terminal_app,
                     activateWithOptions: NSApplicationActivationOptions::NSApplicationActivateIgnoringOtherApps
                 ];
-                // Brief wait for activation
-                thread::sleep(Duration::from_millis(50));
+                // Wait for terminal to fully gain focus
+                thread::sleep(Duration::from_millis(150));
             }
 
-            // 3. Create and post key events
+            // 2. Create and post key events
             let source = CGEventSource::new(CGEventSourceStateID::HIDSystemState)
                 .map_err(|_| "Failed to create event source".to_string())?;
 
-            // Key character
+            // Key character — set Unicode string so terminals receive the correct char
+            let key_char = key.chars().next().unwrap();
             let key_down = CGEvent::new_keyboard_event(source.clone(), keycode, true)
                 .map_err(|_| "Failed to create key down event".to_string())?;
+            set_event_unicode(&key_down, key_char);
             let key_up = CGEvent::new_keyboard_event(source.clone(), keycode, false)
                 .map_err(|_| "Failed to create key up event".to_string())?;
+            set_event_unicode(&key_up, key_char);
             key_down.post(CGEventTapLocation::HID);
             key_up.post(CGEventTapLocation::HID);
 
-            thread::sleep(Duration::from_millis(10));
+            // Wait for the character to be processed before sending Return
+            thread::sleep(Duration::from_millis(30));
 
             // Return key
             let ret_down = CGEvent::new_keyboard_event(source.clone(), RETURN_KEYCODE, true)
                 .map_err(|_| "Failed to create return down event".to_string())?;
+            set_event_unicode(&ret_down, '\r');
             let ret_up = CGEvent::new_keyboard_event(source, RETURN_KEYCODE, false)
                 .map_err(|_| "Failed to create return up event".to_string())?;
+            set_event_unicode(&ret_up, '\r');
             ret_down.post(CGEventTapLocation::HID);
             ret_up.post(CGEventTapLocation::HID);
 
-            // 4. Reactivate previous app
-            thread::sleep(Duration::from_millis(50));
-            if front_app != nil {
-                let _: () = msg_send![
-                    front_app,
-                    activateWithOptions: NSApplicationActivationOptions::NSApplicationActivateIgnoringOtherApps
-                ];
-            }
+            // 3. Keep terminal focused — user wants to see the result
         }
 
         Ok(())

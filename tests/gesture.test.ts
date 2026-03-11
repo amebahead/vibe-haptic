@@ -77,7 +77,7 @@ function createMockNative(onGesture?: (cb: (gesture: string) => void) => void): 
 }
 
 describe('handlePermissionGesture', () => {
-  test('sends "y" keystroke on single tap', async () => {
+  test('sends "1" keystroke on single tap (Yes)', async () => {
     const { native, calls } = createMockNative((cb) => {
       setTimeout(() => cb('single'), 10)
     })
@@ -89,10 +89,10 @@ describe('handlePermissionGesture', () => {
 
     const keystrokeCall = calls.find((c) => c.fn === 'sendKeystrokeToTerminal')
     expect(keystrokeCall).toBeDefined()
-    expect(keystrokeCall!.args).toEqual([12345, 'y'])
+    expect(keystrokeCall!.args).toEqual([12345, '1'])
   })
 
-  test('sends "n" keystroke on double tap', async () => {
+  test('sends "3" keystroke on double tap (No)', async () => {
     const { native, calls } = createMockNative((cb) => {
       setTimeout(() => cb('double'), 10)
     })
@@ -104,7 +104,7 @@ describe('handlePermissionGesture', () => {
 
     const keystrokeCall = calls.find((c) => c.fn === 'sendKeystrokeToTerminal')
     expect(keystrokeCall).toBeDefined()
-    expect(keystrokeCall!.args).toEqual([12345, 'n'])
+    expect(keystrokeCall!.args).toEqual([12345, '3'])
   })
 
   test('triggers confirm-yes haptic on single tap', async () => {

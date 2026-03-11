@@ -104,7 +104,7 @@ export async function handlePermissionGesture(terminalPid: number, options?: Ges
       if (answered) return
       answered = true
 
-      const key = gesture === 'single' ? 'y' : 'n'
+      const key = gesture === 'single' ? '1' : '3'
       native.sendKeystrokeToTerminal(terminalPid, key)
 
       const pattern = gesture === 'single' ? 'confirm-yes' : 'confirm-no'

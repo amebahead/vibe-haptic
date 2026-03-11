@@ -330,6 +330,7 @@ dependencies = [
  "cocoa",
  "core-foundation",
  "core-graphics",
+ "foreign-types",
  "libc",
  "napi",
  "napi-build",

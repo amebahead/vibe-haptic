@@ -13,12 +13,22 @@
     ],
     "Notification": [
       {
-        "matcher": "permission_prompt|idle_prompt|elicitation_dialog",
+        "matcher": "idle_prompt|elicitation_dialog",
         "hooks": [
           {
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/haptic-hook.js",
             "timeout": 5000
+          }
+        ]
+      },
+      {
+        "matcher": "permission_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/haptic-hook.js",
+            "timeout": 15000
           }
         ]
       }
