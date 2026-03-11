@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { HapticEngine, parseBeat } from '../src/haptic'
+import { DEFAULT_CONFIG, loadConfig } from '../src/config'
 import type { HapticConfig } from '../src/types'
 
 const mockNativeModule = { actuate: () => {} }
@@ -90,6 +91,24 @@ describe('Platform Handling', () => {
   test('gracefully handles null native module', () => {
     const engine = new HapticEngine({}, { nativeModule: null })
     expect(() => engine.trigger('tap')).not.toThrow()
+  })
+})
+
+describe('Gesture Config', () => {
+  test('DEFAULT_CONFIG includes gesture defaults', () => {
+    expect(DEFAULT_CONFIG.gesture).toEqual({
+      enabled: true,
+      tapTimeout: 300,
+      listenTimeout: 10_000,
+    })
+  })
+
+  test('loadConfig returns gesture config with expected shape', () => {
+    const config = loadConfig('claude')
+    expect(config.gesture).toBeDefined()
+    expect(typeof config.gesture!.enabled).toBe('boolean')
+    expect(typeof config.gesture!.tapTimeout).toBe('number')
+    expect(typeof config.gesture!.listenTimeout).toBe('number')
   })
 })
 

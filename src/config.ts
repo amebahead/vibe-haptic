@@ -1,6 +1,12 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import type { HapticConfig, PatternConfig } from './types'
+import type { GestureConfig, HapticConfig, PatternConfig } from './types'
+
+export const DEFAULT_GESTURE_CONFIG: GestureConfig = {
+  enabled: true,
+  tapTimeout: 300,
+  listenTimeout: 10_000,
+}
 
 export const DEFAULT_CONFIG: HapticConfig = {
   patterns: {},
@@ -8,6 +14,7 @@ export const DEFAULT_CONFIG: HapticConfig = {
     stop: 'vibe',
     prompt: 'alert',
   },
+  gesture: { ...DEFAULT_GESTURE_CONFIG },
 }
 
 export function getConfigPath(agent: 'claude' | 'opencode', scope: 'local' | 'global'): string {
@@ -23,6 +30,7 @@ function mergeConfig(base: HapticConfig, override: Partial<HapticConfig>): Hapti
   return {
     patterns: { ...base.patterns, ...(override.patterns as Record<string, string | PatternConfig>) },
     events: { ...base.events, ...override.events },
+    gesture: { ...base.gesture, ...override.gesture },
   }
 }
 
