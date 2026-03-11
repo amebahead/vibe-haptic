@@ -141,11 +141,24 @@ pub mod macos {
 
     const RETURN_KEYCODE: u16 = 0x24;
 
+    fn post_key_event(source: &CGEventSource, keycode: u16, ch: char) -> Result<(), String> {
+        let down = CGEvent::new_keyboard_event(source.clone(), keycode, true)
+            .map_err(|_| format!("Failed to create key down event for '{}'", ch))?;
+        set_event_unicode(&down, ch);
+        let up = CGEvent::new_keyboard_event(source.clone(), keycode, false)
+            .map_err(|_| format!("Failed to create key up event for '{}'", ch))?;
+        set_event_unicode(&up, ch);
+        down.post(CGEventTapLocation::HID);
+        up.post(CGEventTapLocation::HID);
+        Ok(())
+    }
+
     pub fn send_keystroke_to_terminal(terminal_pid: i32, key: &str) -> Result<(), String> {
-        let keycode = key
+        let key_char = key
             .chars()
             .next()
-            .and_then(keycode_for_char)
+            .ok_or_else(|| "Empty key string".to_string())?;
+        let keycode = keycode_for_char(key_char)
             .ok_or_else(|| format!("Unsupported key: {}", key))?;
 
         unsafe {
@@ -168,29 +181,12 @@ pub mod macos {
             let source = CGEventSource::new(CGEventSourceStateID::HIDSystemState)
                 .map_err(|_| "Failed to create event source".to_string())?;
 
-            // Key character — set Unicode string so terminals receive the correct char
-            let key_char = key.chars().next().unwrap();
-            let key_down = CGEvent::new_keyboard_event(source.clone(), keycode, true)
-                .map_err(|_| "Failed to create key down event".to_string())?;
-            set_event_unicode(&key_down, key_char);
-            let key_up = CGEvent::new_keyboard_event(source.clone(), keycode, false)
-                .map_err(|_| "Failed to create key up event".to_string())?;
-            set_event_unicode(&key_up, key_char);
-            key_down.post(CGEventTapLocation::HID);
-            key_up.post(CGEventTapLocation::HID);
+            post_key_event(&source, keycode, key_char)?;
 
             // Wait for the character to be processed before sending Return
             thread::sleep(Duration::from_millis(30));
 
-            // Return key
-            let ret_down = CGEvent::new_keyboard_event(source.clone(), RETURN_KEYCODE, true)
-                .map_err(|_| "Failed to create return down event".to_string())?;
-            set_event_unicode(&ret_down, '\r');
-            let ret_up = CGEvent::new_keyboard_event(source, RETURN_KEYCODE, false)
-                .map_err(|_| "Failed to create return up event".to_string())?;
-            set_event_unicode(&ret_up, '\r');
-            ret_down.post(CGEventTapLocation::HID);
-            ret_up.post(CGEventTapLocation::HID);
+            post_key_event(&source, RETURN_KEYCODE, '\r')?;
 
             // 3. Keep terminal focused — user wants to see the result
         }

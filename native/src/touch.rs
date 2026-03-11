@@ -47,6 +47,7 @@ pub mod macos {
     extern "C" {
         fn CFArrayGetCount(array: *const c_void) -> isize;
         fn CFArrayGetValueAtIndex(array: *const c_void, idx: isize) -> *const c_void;
+        fn CFRelease(cf: *const c_void);
     }
 
     // Thread-safe global state for the C callback (MultitouchSupport doesn't support userdata)
@@ -86,25 +87,19 @@ pub mod macos {
 
         // Detect 3-finger lift: was >=3 fingers, now <3
         if prev >= 3 && num_fingers < 3 {
-            if let Some(first_time) = state.first_tap_time {
-                if first_time.elapsed() < state.tap_timeout {
-                    // Second tap within window → double tap (no)
-                    state.first_tap_time = None;
-                    state.callback.call(
-                        "double".to_string(),
-                        ThreadsafeFunctionCallMode::NonBlocking,
-                    );
-                } else {
-                    // First tap expired, treat as new first tap
-                    state.first_tap_time = Some(Instant::now());
-                    let timeout = state.tap_timeout;
-                    let stop_flag = state.stop_flag.clone();
-                    let cb = state.callback.clone();
-                    drop(guard); // Release lock before spawning
-                    schedule_single_tap_timer(timeout, stop_flag, cb);
-                }
+            let is_double_tap = state
+                .first_tap_time
+                .map_or(false, |t| t.elapsed() < state.tap_timeout);
+
+            if is_double_tap {
+                // Second tap within window → double tap (no)
+                state.first_tap_time = None;
+                state.callback.call(
+                    "double".to_string(),
+                    ThreadsafeFunctionCallMode::NonBlocking,
+                );
             } else {
-                // First tap
+                // First tap (or previous tap expired)
                 state.first_tap_time = Some(Instant::now());
                 let timeout = state.tap_timeout;
                 let stop_flag = state.stop_flag.clone();
@@ -157,6 +152,7 @@ pub mod macos {
 
         let count = unsafe { CFArrayGetCount(device_list) };
         if count == 0 {
+            unsafe { CFRelease(device_list as *const c_void) };
             return Err(Error::from_reason("No multitouch devices found"));
         }
 
@@ -182,6 +178,8 @@ pub mod macos {
                 devices.push(DeviceHandle(device));
             }
         }
+
+        unsafe { CFRelease(device_list as *const c_void) };
 
         Ok(devices)
     }

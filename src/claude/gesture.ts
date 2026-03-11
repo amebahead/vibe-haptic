@@ -1,7 +1,9 @@
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { DEFAULT_GESTURE_CONFIG } from '../config'
+import type { HapticEngine } from '../haptic'
 import { createHapticEngine } from '../haptic'
 import type { GestureConfig } from '../types'
 
@@ -40,11 +42,9 @@ export function acquireGestureLock(): boolean {
 
 export function releaseGestureLock(): void {
   try {
-    if (existsSync(LOCK_FILE)) {
-      unlinkSync(LOCK_FILE)
-    }
+    unlinkSync(LOCK_FILE)
   } catch {
-    // Best-effort cleanup
+    // Best-effort cleanup (handles ENOENT and other errors)
   }
 }
 
@@ -60,6 +60,7 @@ export interface NativeGestureModule {
 
 export interface GestureHandlerOptions {
   nativeModule?: NativeGestureModule
+  engine?: HapticEngine
   config?: { gesture: GestureConfig }
   onPatternTriggered?: (patternName: string) => void
 }
@@ -68,11 +69,7 @@ export async function handlePermissionGesture(terminalPid: number, options?: Ges
   const native = options?.nativeModule ?? loadNativeModule()
   if (!native) return
 
-  const gestureConfig = options?.config?.gesture ?? {
-    enabled: true,
-    tapTimeout: 300,
-    listenTimeout: 10_000,
-  }
+  const gestureConfig = options?.config?.gesture ?? DEFAULT_GESTURE_CONFIG
 
   if (!gestureConfig.enabled) return
 
@@ -90,7 +87,7 @@ export async function handlePermissionGesture(terminalPid: number, options?: Ges
     process.exit(0)
   })
 
-  const engine = createHapticEngine('claude')
+  const engine = options?.engine ?? createHapticEngine('claude')
   let answered = false
 
   return new Promise<void>((resolve) => {
@@ -125,7 +122,7 @@ export async function handlePermissionGesture(terminalPid: number, options?: Ges
   })
 }
 
-function loadNativeModule(): NativeGestureModule | null {
+export function loadNativeModule(): NativeGestureModule | null {
   try {
     const currentDir = dirname(fileURLToPath(import.meta.url))
     const nativePath = join(currentDir, '..', 'native', 'vibe-haptic-native.node')

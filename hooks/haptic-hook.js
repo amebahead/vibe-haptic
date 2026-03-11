@@ -2,10 +2,7 @@
 
 // src/claude/hook.ts
 import { appendFileSync } from "node:fs";
-import { createRequire as createRequire3 } from "node:module";
 import { homedir as homedir2 } from "node:os";
-import { dirname as dirname3, join as join3 } from "node:path";
-import { fileURLToPath as fileURLToPath3 } from "node:url";
 
 // src/config.ts
 import { existsSync, readFileSync } from "node:fs";
@@ -201,7 +198,7 @@ function createHapticEngine(agent) {
 }
 
 // src/claude/gesture.ts
-import { existsSync as existsSync2, readFileSync as readFileSync2, unlinkSync, writeFileSync } from "node:fs";
+import { readFileSync as readFileSync2, unlinkSync, writeFileSync } from "node:fs";
 import { createRequire as createRequire2 } from "node:module";
 import { dirname as dirname2, join as join2 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
@@ -230,20 +227,14 @@ function acquireGestureLock() {
 }
 function releaseGestureLock() {
   try {
-    if (existsSync2(LOCK_FILE)) {
-      unlinkSync(LOCK_FILE);
-    }
+    unlinkSync(LOCK_FILE);
   } catch {}
 }
 async function handlePermissionGesture(terminalPid, options) {
   const native = options?.nativeModule ?? loadNativeModule();
   if (!native)
     return;
-  const gestureConfig = options?.config?.gesture ?? {
-    enabled: true,
-    tapTimeout: 300,
-    listenTimeout: 1e4
-  };
+  const gestureConfig = options?.config?.gesture ?? DEFAULT_GESTURE_CONFIG;
   if (!gestureConfig.enabled)
     return;
   if (!acquireGestureLock())
@@ -257,7 +248,7 @@ async function handlePermissionGesture(terminalPid, options) {
     releaseGestureLock();
     process.exit(0);
   });
-  const engine = createHapticEngine("claude");
+  const engine = options?.engine ?? createHapticEngine("claude");
   let answered = false;
   return new Promise((resolve) => {
     const cleanup = () => {
@@ -308,23 +299,9 @@ function debug(message, data) {
 `;
   appendFileSync(logPath, logLine);
 }
-var DEFAULT_GESTURE_CONFIG2 = {
-  enabled: true,
-  tapTimeout: 300,
-  listenTimeout: 1e4
-};
-function loadNativeModule2() {
-  try {
-    const currentDir = dirname3(fileURLToPath3(import.meta.url));
-    const nativePath = join3(currentDir, "..", "native", "vibe-haptic-native.node");
-    const require2 = createRequire3(import.meta.url);
-    return require2(nativePath);
-  } catch {
-    return null;
-  }
-}
 async function handleHookEvent(input) {
   debug("handleHookEvent called", input);
+  const config = loadConfig("claude");
   const engine = createHapticEngine("claude");
   if (input.hook_event_name === "Stop") {
     debug("Triggering stop event");
@@ -333,12 +310,8 @@ async function handleHookEvent(input) {
     debug("Triggering prompt event for notification", { notification_type: input.notification_type });
     if (input.notification_type === "permission_prompt") {
       debug("Permission prompt detected — checking gesture eligibility");
-      const config = loadConfig("claude");
-      const gestureConfig = {
-        ...DEFAULT_GESTURE_CONFIG2,
-        ...config.gesture
-      };
-      const native = gestureConfig.enabled ? loadNativeModule2() : null;
+      const gestureConfig = config.gesture;
+      const native = gestureConfig.enabled ? loadNativeModule() : null;
       let terminalPid = null;
       if (native?.isAccessibilityGranted()) {
         terminalPid = native.findTerminalPid();
@@ -349,6 +322,7 @@ async function handleHookEvent(input) {
           engine.triggerForEvent("prompt"),
           handlePermissionGesture(terminalPid, {
             nativeModule: native,
+            engine,
             config: { gesture: gestureConfig }
           })
         ]);

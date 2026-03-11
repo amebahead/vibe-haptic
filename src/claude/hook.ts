@@ -1,13 +1,9 @@
 import { appendFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { loadConfig } from '../config'
 import { createHapticEngine } from '../haptic'
 import type { GestureConfig } from '../types'
-import type { NativeGestureModule } from './gesture'
-import { handlePermissionGesture } from './gesture'
+import { handlePermissionGesture, loadNativeModule } from './gesture'
 
 const DEBUG = process.env.VIBE_HAPTIC_DEBUG === '1'
 
@@ -27,26 +23,10 @@ interface ClaudeHookInput {
   notification_type?: string
 }
 
-const DEFAULT_GESTURE_CONFIG: GestureConfig = {
-  enabled: true,
-  tapTimeout: 300,
-  listenTimeout: 10_000,
-}
-
-function loadNativeModule(): NativeGestureModule | null {
-  try {
-    const currentDir = dirname(fileURLToPath(import.meta.url))
-    const nativePath = join(currentDir, '..', 'native', 'vibe-haptic-native.node')
-    const require = createRequire(import.meta.url)
-    return require(nativePath)
-  } catch {
-    return null
-  }
-}
-
 export async function handleHookEvent(input: ClaudeHookInput): Promise<void> {
   debug('handleHookEvent called', input)
 
+  const config = loadConfig('claude')
   const engine = createHapticEngine('claude')
 
   if (input.hook_event_name === 'Stop') {
@@ -58,12 +38,7 @@ export async function handleHookEvent(input: ClaudeHookInput): Promise<void> {
     if (input.notification_type === 'permission_prompt') {
       debug('Permission prompt detected — checking gesture eligibility')
 
-      const config = loadConfig('claude')
-      const gestureConfig: GestureConfig = {
-        ...DEFAULT_GESTURE_CONFIG,
-        ...config.gesture,
-      }
-
+      const gestureConfig = config.gesture as GestureConfig
       const native = gestureConfig.enabled ? loadNativeModule() : null
       let terminalPid: number | null = null
 
@@ -78,6 +53,7 @@ export async function handleHookEvent(input: ClaudeHookInput): Promise<void> {
           engine.triggerForEvent('prompt'),
           handlePermissionGesture(terminalPid, {
             nativeModule: native,
+            engine,
             config: { gesture: gestureConfig },
           }),
         ])
