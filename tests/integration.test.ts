@@ -139,7 +139,6 @@ describe('GestureConfig type', () => {
   })
 })
 
-
 describe('parseBeat', () => {
   test('parses simple actuation digits', () => {
     const tokens = parseBeat('66', 1.0)

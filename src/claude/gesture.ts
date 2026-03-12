@@ -14,10 +14,7 @@ export interface GestureHandlerOptions {
   onPatternTriggered?: (patternName: string) => void
 }
 
-export async function handlePermissionGesture(
-  terminalPid: number,
-  options: GestureHandlerOptions,
-): Promise<void> {
+export async function handlePermissionGesture(terminalPid: number, options: GestureHandlerOptions): Promise<void> {
   const { nativeModule, engine, gesture } = options
   let answered = false
 
