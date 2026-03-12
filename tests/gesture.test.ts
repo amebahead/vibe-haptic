@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import type { GestureHandlerOptions } from '../src/claude/gesture'
-import { handlePermissionGesture } from '../src/claude/gesture'
+import type { GestureHandlerOptions } from '../src/gesture'
+import { handlePermissionGesture } from '../src/gesture'
 import type { HapticConfig } from '../src/types'
 
 const DEFAULT_GESTURE = { enabled: true, tapTimeout: 300, listenTimeout: 10_000 }

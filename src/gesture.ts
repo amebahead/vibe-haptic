@@ -1,5 +1,5 @@
-import type { HapticEngine } from '../haptic'
-import type { GestureConfig } from '../types'
+import type { HapticEngine } from './haptic'
+import type { GestureConfig } from './types'
 
 export type GestureType = 'single' | 'double'
 

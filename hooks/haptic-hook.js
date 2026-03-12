@@ -2,10 +2,7 @@
 
 // src/claude/hook.ts
 import { appendFileSync } from "node:fs";
-import { createRequire as createRequire2 } from "node:module";
 import { homedir as homedir2 } from "node:os";
-import { dirname as dirname2, join as join2 } from "node:path";
-import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // src/config.ts
 import { existsSync, readFileSync } from "node:fs";
@@ -54,6 +51,32 @@ function loadConfig(agent = "claude") {
     } catch {}
   }
   return config;
+}
+
+// src/gesture.ts
+async function handlePermissionGesture(terminalPid, options) {
+  const { nativeModule, engine, gesture } = options;
+  let answered = false;
+  return new Promise((resolve) => {
+    const cleanup = () => {
+      nativeModule.stopTouchListener();
+      resolve();
+    };
+    nativeModule.startTouchListener((gestureType) => {
+      if (answered)
+        return;
+      answered = true;
+      const key = gestureType === "single" ? "1" : "3";
+      nativeModule.sendKeystrokeToTerminal(terminalPid, key);
+      options.onPatternTriggered?.("alert");
+      engine.trigger("alert");
+      cleanup();
+    }, gesture.tapTimeout);
+    setTimeout(() => {
+      if (!answered)
+        cleanup();
+    }, gesture.listenTimeout);
+  });
 }
 
 // src/haptic.ts
@@ -198,30 +221,19 @@ function createHapticEngine(agent) {
   return new HapticEngine(loadConfig(agent));
 }
 
-// src/claude/gesture.ts
-async function handlePermissionGesture(terminalPid, options) {
-  const { nativeModule, engine, gesture } = options;
-  let answered = false;
-  return new Promise((resolve) => {
-    const cleanup = () => {
-      nativeModule.stopTouchListener();
-      resolve();
-    };
-    nativeModule.startTouchListener((gestureType) => {
-      if (answered)
-        return;
-      answered = true;
-      const key = gestureType === "single" ? "1" : "3";
-      nativeModule.sendKeystrokeToTerminal(terminalPid, key);
-      options.onPatternTriggered?.("alert");
-      engine.trigger("alert");
-      cleanup();
-    }, gesture.tapTimeout);
-    setTimeout(() => {
-      if (!answered)
-        cleanup();
-    }, gesture.listenTimeout);
-  });
+// src/native.ts
+import { createRequire as createRequire2 } from "node:module";
+import { dirname as dirname2, join as join2 } from "node:path";
+import { fileURLToPath as fileURLToPath2 } from "node:url";
+function loadNativeModule() {
+  try {
+    const currentDir = dirname2(fileURLToPath2(import.meta.url));
+    const nativePath = join2(currentDir, "..", "native", "vibe-haptic-native.node");
+    const require2 = createRequire2(import.meta.url);
+    return require2(nativePath);
+  } catch {
+    return null;
+  }
 }
 
 // src/claude/hook.ts
@@ -235,16 +247,6 @@ function debug(message, data) {
 ` : `[${timestamp}] ${message}
 `;
   appendFileSync(logPath, logLine);
-}
-function loadNativeModule() {
-  try {
-    const currentDir = dirname2(fileURLToPath2(import.meta.url));
-    const nativePath = join2(currentDir, "..", "native", "vibe-haptic-native.node");
-    const require2 = createRequire2(import.meta.url);
-    return require2(nativePath);
-  } catch {
-    return null;
-  }
 }
 async function handleHookEvent(input) {
   debug("handleHookEvent called", input);

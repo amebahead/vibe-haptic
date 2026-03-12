@@ -1,4 +1,8 @@
+import { loadConfig } from '../config'
+import { handlePermissionGesture } from '../gesture'
 import { createHapticEngine } from '../haptic'
+import { loadNativeModule } from '../native'
+import type { GestureConfig } from '../types'
 
 type SessionStatusType = 'idle' | 'busy' | 'retry'
 
@@ -39,6 +43,7 @@ type PluginInput = {
 }
 
 export const vibeHapticPlugin = async (ctx: PluginInput) => {
+  const config = loadConfig('opencode')
   const engine = createHapticEngine('opencode')
   const subprocessCache = new Map<string, boolean>()
 
@@ -64,6 +69,36 @@ export const vibeHapticPlugin = async (ctx: PluginInput) => {
     return undefined
   }
 
+  async function tryGestureWithHaptic(): Promise<void> {
+    const gestureConfig = config.gesture as GestureConfig
+
+    if (!gestureConfig.enabled) {
+      await engine.triggerForEvent('prompt')
+      return
+    }
+
+    const native = loadNativeModule()
+    if (!native?.isAccessibilityGranted()) {
+      await engine.triggerForEvent('prompt')
+      return
+    }
+
+    const terminalPid = native.findTerminalPid()
+    if (terminalPid === null) {
+      await engine.triggerForEvent('prompt')
+      return
+    }
+
+    await Promise.all([
+      engine.triggerForEvent('prompt'),
+      handlePermissionGesture(terminalPid, {
+        nativeModule: native,
+        engine,
+        gesture: gestureConfig,
+      }),
+    ])
+  }
+
   return {
     event: async (input: { event: OpenCodeEvent }): Promise<void> => {
       const { event } = input
@@ -73,7 +108,9 @@ export const vibeHapticPlugin = async (ctx: PluginInput) => {
 
       if (event.type === 'session.idle') {
         engine.triggerForEvent('stop')
-      } else if (event.type === 'permission.updated' || event.type === 'question.asked') {
+      } else if (event.type === 'permission.updated') {
+        await tryGestureWithHaptic()
+      } else if (event.type === 'question.asked') {
         engine.triggerForEvent('prompt')
       }
     },

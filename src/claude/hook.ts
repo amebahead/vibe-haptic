@@ -1,12 +1,10 @@
 import { appendFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { loadConfig } from '../config'
+import { handlePermissionGesture } from '../gesture'
 import { createHapticEngine } from '../haptic'
+import { loadNativeModule } from '../native'
 import type { GestureConfig } from '../types'
-import { handlePermissionGesture } from './gesture'
 
 const DEBUG = process.env.VIBE_HAPTIC_DEBUG === '1'
 
@@ -16,17 +14,6 @@ function debug(message: string, data?: unknown) {
   const timestamp = new Date().toISOString()
   const logLine = data ? `[${timestamp}] ${message}: ${JSON.stringify(data, null, 2)}\n` : `[${timestamp}] ${message}\n`
   appendFileSync(logPath, logLine)
-}
-
-function loadNativeModule() {
-  try {
-    const currentDir = dirname(fileURLToPath(import.meta.url))
-    const nativePath = join(currentDir, '..', 'native', 'vibe-haptic-native.node')
-    const require = createRequire(import.meta.url)
-    return require(nativePath)
-  } catch {
-    return null
-  }
 }
 
 interface ClaudeHookInput {
