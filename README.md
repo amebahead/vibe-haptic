@@ -50,6 +50,10 @@ Add to your `opencode.jsonc`:
 }
 ```
 
+## Permissions
+
+Gesture input requires **System Settings > Privacy & Security > Accessibility** permission for your terminal app.
+
 ## Configuration
 
 Everything works out of the box — just install and go. But if you want to tweak the patterns or map different events, here's how.
