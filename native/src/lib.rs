@@ -13,9 +13,13 @@ use std::sync::{Arc, Mutex as StdMutex};
 use napi::threadsafe_function::{ErrorStrategy, ThreadsafeFunction};
 
 #[cfg(target_os = "macos")]
-static ACTIVE_DEVICES: StdMutex<Option<Vec<touch::macos::DeviceHandle>>> = StdMutex::new(None);
+struct ActiveListener {
+    devices: Vec<touch::macos::DeviceHandle>,
+    stop_flag: Arc<AtomicBool>,
+}
+
 #[cfg(target_os = "macos")]
-static ACTIVE_STOP_FLAG: StdMutex<Option<Arc<AtomicBool>>> = StdMutex::new(None);
+static ACTIVE_LISTENER: StdMutex<Option<ActiveListener>> = StdMutex::new(None);
 
 #[cfg(target_os = "macos")]
 mod macos {
@@ -282,11 +286,8 @@ pub fn start_touch_listener(
 
         let devices = touch::macos::start_touch_listener(tsfn, timeout, stop_flag.clone())?;
 
-        if let Ok(mut guard) = ACTIVE_DEVICES.lock() {
-            *guard = Some(devices);
-        }
-        if let Ok(mut guard) = ACTIVE_STOP_FLAG.lock() {
-            *guard = Some(stop_flag);
+        if let Ok(mut guard) = ACTIVE_LISTENER.lock() {
+            *guard = Some(ActiveListener { devices, stop_flag });
         }
 
         Ok(())
@@ -302,18 +303,11 @@ pub fn start_touch_listener(
 pub fn stop_touch_listener() {
     #[cfg(target_os = "macos")]
     {
-        if let Ok(guard) = ACTIVE_STOP_FLAG.lock() {
-            if let Some(ref flag) = *guard {
-                flag.store(true, Ordering::Relaxed);
+        if let Ok(mut guard) = ACTIVE_LISTENER.lock() {
+            if let Some(ref listener) = *guard {
+                listener.stop_flag.store(true, Ordering::Relaxed);
+                touch::macos::stop_touch_listener(&listener.devices);
             }
-        }
-        if let Ok(mut guard) = ACTIVE_DEVICES.lock() {
-            if let Some(ref devices) = *guard {
-                touch::macos::stop_touch_listener(devices);
-            }
-            *guard = None;
-        }
-        if let Ok(mut guard) = ACTIVE_STOP_FLAG.lock() {
             *guard = None;
         }
     }
