@@ -58,7 +58,7 @@ describe('handlePermissionGesture', () => {
     expect(keystrokeCall!.args).toEqual([12345, '3'])
   })
 
-  test('triggers confirm-yes haptic on single tap', async () => {
+  test('triggers alert haptic on gesture', async () => {
     const triggeredPatterns: string[] = []
     const { nativeModule } = createMockNative((cb) => {
       setTimeout(() => cb('single'), 10)
@@ -71,7 +71,7 @@ describe('handlePermissionGesture', () => {
       onPatternTriggered: (name) => triggeredPatterns.push(name),
     })
 
-    expect(triggeredPatterns).toContain('confirm-yes')
+    expect(triggeredPatterns).toContain('alert')
   })
 
   test('auto-stops after listenTimeout with no gesture', async () => {

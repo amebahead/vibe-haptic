@@ -34,9 +34,8 @@ export async function handlePermissionGesture(
       const key = gestureType === 'single' ? '1' : '3'
       nativeModule.sendKeystrokeToTerminal(terminalPid, key)
 
-      const pattern = gestureType === 'single' ? 'confirm-yes' : 'confirm-no'
-      options.onPatternTriggered?.(pattern)
-      engine.trigger(pattern)
+      options.onPatternTriggered?.('alert')
+      engine.trigger('alert')
 
       cleanup()
     }, gesture.tapTimeout)
