@@ -67,9 +67,7 @@ var DEFAULT_PATTERNS = {
   vibe: { beat: "6/0.8 3/1.0   6/1.0" },
   alert: { beat: "6/0.5 6/1.0 6/0.5" },
   dopamine: { beat: "6666666 5/1.0 4/1.0 3/1.0", intensity: 0.1 },
-  noise: { beat: "6543654365436543" },
-  "confirm-yes": { beat: "6/0.6 3/0.4" },
-  "confirm-no": { beat: "6/1.0  6/1.0" }
+  noise: { beat: "6543654365436543" }
 };
 function resolvePattern(nameOrBeat, patterns) {
   const isInlineBeat = /^[3-6/.\s]+$/.test(nameOrBeat);
@@ -215,9 +213,8 @@ async function handlePermissionGesture(terminalPid, options) {
       answered = true;
       const key = gestureType === "single" ? "1" : "3";
       nativeModule.sendKeystrokeToTerminal(terminalPid, key);
-      const pattern = gestureType === "single" ? "confirm-yes" : "confirm-no";
-      options.onPatternTriggered?.(pattern);
-      engine.trigger(pattern);
+      options.onPatternTriggered?.("alert");
+      engine.trigger("alert");
       cleanup();
     }, gesture.tapTimeout);
     setTimeout(() => {
