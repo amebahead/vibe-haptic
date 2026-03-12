@@ -14,8 +14,8 @@ napi-derive = "2.16"
 core-foundation = "0.10"
 core-graphics = "0.24"
 foreign-types = "0.5"
-cocoa = "0.26"
-objc = "0.2"
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSRunningApplication"] }
 libc = "0.2"
 
 [build-dependencies]

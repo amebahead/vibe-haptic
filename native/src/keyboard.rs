@@ -95,11 +95,9 @@ pub mod macos {
 
     // --- Keystroke injection ---
 
-    use cocoa::appkit::NSApplicationActivationOptions;
-    use cocoa::base::{id, nil};
     use core_graphics::event::{CGEvent, CGEventTapLocation};
     use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
-    use objc::{class, msg_send, sel, sel_impl};
+    use objc2_app_kit::{NSApplicationActivationOptions, NSRunningApplication};
     use std::thread;
     use std::time::Duration;
 
@@ -153,6 +151,7 @@ pub mod macos {
         Ok(())
     }
 
+    #[allow(deprecated)]
     pub fn send_keystroke_to_terminal(terminal_pid: i32, key: &str) -> Result<(), String> {
         let key_char = key
             .chars()
@@ -161,35 +160,31 @@ pub mod macos {
         let keycode = keycode_for_char(key_char)
             .ok_or_else(|| format!("Unsupported key: {}", key))?;
 
-        unsafe {
-            // 1. Activate terminal by PID (bring to front so CGEvent reaches it)
-            let terminal_app: id = msg_send![
-                class!(NSRunningApplication),
-                runningApplicationWithProcessIdentifier: terminal_pid
-            ];
+        // 1. Activate terminal by PID (bring to front so CGEvent reaches it)
+        let terminal_app =
+            NSRunningApplication::runningApplicationWithProcessIdentifier(terminal_pid);
 
-            if terminal_app != nil {
-                let _: () = msg_send![
-                    terminal_app,
-                    activateWithOptions: NSApplicationActivationOptions::NSApplicationActivateIgnoringOtherApps
-                ];
-                // Wait for terminal to fully gain focus
-                thread::sleep(Duration::from_millis(150));
-            }
-
-            // 2. Create and post key events
-            let source = CGEventSource::new(CGEventSourceStateID::HIDSystemState)
-                .map_err(|_| "Failed to create event source".to_string())?;
-
-            post_key_event(&source, keycode, key_char)?;
-
-            // Wait for the character to be processed before sending Return
-            thread::sleep(Duration::from_millis(30));
-
-            post_key_event(&source, RETURN_KEYCODE, '\r')?;
-
-            // 3. Keep terminal focused — user wants to see the result
+        if let Some(app) = terminal_app {
+            #[allow(deprecated)]
+            app.activateWithOptions(
+                NSApplicationActivationOptions::ActivateIgnoringOtherApps,
+            );
+            // Wait for terminal to fully gain focus
+            thread::sleep(Duration::from_millis(150));
         }
+
+        // 2. Create and post key events
+        let source = CGEventSource::new(CGEventSourceStateID::HIDSystemState)
+            .map_err(|_| "Failed to create event source".to_string())?;
+
+        post_key_event(&source, keycode, key_char)?;
+
+        // Wait for the character to be processed before sending Return
+        thread::sleep(Duration::from_millis(30));
+
+        post_key_event(&source, RETURN_KEYCODE, '\r')?;
+
+        // 3. Keep terminal focused — user wants to see the result
 
         Ok(())
     }
